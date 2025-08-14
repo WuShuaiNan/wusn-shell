@@ -158,9 +158,10 @@ program_install() {
     echo -e "\n${GREEN}=== 程序安装 ===${NC}"
     echo "1. 安装 OpenJDK [1.8.0.412.b08]"
     echo "2. 安装 Telnet [0.17-66]"
-    echo "3. 返回主菜单"
+    echo "3. 安装 Wget [1.14-18]"
+    echo "4. 返回主菜单"
 
-    read -p "请选择操作 [1-3]: " install_choice
+    read -p "请选择操作 [1-4]: " install_choice
 
     case $install_choice in
         1)
@@ -182,6 +183,15 @@ program_install() {
             fi
             ;;
         3)
+            echo -e "${BLUE}正在安装 Wget ...${NC}"
+            if bash ${SCRIPT_DIR}/package/wget/install.sh; then
+                echo -e "${GREEN} Wget 安装成功!${NC}"
+            else
+                echo -e "${RED} Wget 安装失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        4)
             return
             ;;
         *)
@@ -198,7 +208,8 @@ program_uninstall() {
     echo -e "\n${GREEN}=== 程序卸载 ===${NC}"
     echo "1. 卸载 OpenJDK [1.8.0.412.b08]"
     echo "2. 卸载 Telnet [0.17-66]"
-    echo "3. 返回主菜单"
+    echo "3. 卸载 Wget [1.14-18]"
+    echo "4. 返回主菜单"
 
     read -p "请选择操作 [1-3]: " uninstall_choice
 
@@ -222,6 +233,15 @@ program_uninstall() {
             fi
             ;;
         3)
+            echo -e "${BLUE}正在卸载 Wget ...${NC}"
+            if bash ${SCRIPT_DIR}/package/wget/uninstall.sh; then
+                echo -e "${GREEN} Wget 卸载成功!${NC}"
+            else
+                echo -e "${RED} Wget 卸载失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        4)
             return
             ;;
         *)
@@ -230,7 +250,7 @@ program_uninstall() {
     esac
 
     # 递归一下
-    program_deployment
+    program_uninstall
 }
 
 # 主菜单
