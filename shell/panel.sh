@@ -156,22 +156,32 @@ network_tools() {
 # 5.程序安装
 program_install() {
     echo -e "\n${GREEN}=== 程序安装 ===${NC}"
-    echo "1. 安装OpenJDK 8 [1.8.0.412.b08]"
-    echo "2. 返回主菜单"
+    echo "1. 安装 OpenJDK [1.8.0.412.b08]"
+    echo "2. 安装 Telnet [0.17-66]"
+    echo "3. 返回主菜单"
 
-    read -p "请选择操作 [1-2]: " install_choice
+    read -p "请选择操作 [1-3]: " install_choice
 
     case $install_choice in
         1)
-            echo -e "${BLUE}正在安装OpenJDK 8...${NC}"
+            echo -e "${BLUE}正在安装 OpenJDK ...${NC}"
             if bash ${SCRIPT_DIR}/package/openjdk/install.sh; then
-                echo -e "${GREEN}OpenJDK 8 安装成功!${NC}"
+                echo -e "${GREEN} OpenJDK 安装成功!${NC}"
             else
-                echo -e "${RED}OpenJDK 8 安装失败! 错误代码: $?${NC}"
+                echo -e "${RED} OpenJDK 安装失败! 错误代码: $?${NC}"
                 read -p "按回车键继续..."
             fi
             ;;
         2)
+            echo -e "${BLUE}正在安装 Telnet ...${NC}"
+            if bash ${SCRIPT_DIR}/package/telnet/install.sh; then
+                echo -e "${GREEN} Telnet 安装成功!${NC}"
+            else
+                echo -e "${RED} Telnet 安装失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        3)
             return
             ;;
         *)
@@ -186,22 +196,32 @@ program_install() {
 # 6.程序卸载
 program_uninstall() {
     echo -e "\n${GREEN}=== 程序卸载 ===${NC}"
-    echo "1. 安装OpenJDK 8 [1.8.0.412.b08]"
-    echo "2. 返回主菜单"
+    echo "1. 卸载 OpenJDK [1.8.0.412.b08]"
+    echo "2. 卸载 Telnet [0.17-66]"
+    echo "3. 返回主菜单"
 
-    read -p "请选择操作 [1-2]: " uninstall_choice
+    read -p "请选择操作 [1-3]: " uninstall_choice
 
     case $uninstall_choice in
         1)
-            echo -e "${BLUE}正在卸载OpenJDK 8...${NC}"
+            echo -e "${BLUE}正在卸载 OpenJDK ...${NC}"
             if bash ${SCRIPT_DIR}/package/openjdk/uninstall.sh; then
-                echo -e "${GREEN}OpenJDK 8 卸载成功!${NC}"
+                echo -e "${GREEN} OpenJDK 卸载成功!${NC}"
             else
-                echo -e "${RED}OpenJDK 8 卸载失败! 错误代码: $?${NC}"
+                echo -e "${RED} OpenJDK 卸载失败! 错误代码: $?${NC}"
                 read -p "按回车键继续..."
             fi
             ;;
         2)
+            echo -e "${BLUE}正在卸载 Telnet ...${NC}"
+            if bash ${SCRIPT_DIR}/package/telnet/uninstall.sh; then
+                echo -e "${GREEN} Telnet 卸载成功!${NC}"
+            else
+                echo -e "${RED} Telnet 卸载失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        3)
             return
             ;;
         *)
@@ -227,7 +247,7 @@ main_menu() {
     echo "6. 程序卸载"
     echo "7. 退出"
 
-    read -p "请选择功能 [1-5]: " main_choice
+    read -p "请选择功能 [1-7]: " main_choice
 
     case $main_choice in
         1)
