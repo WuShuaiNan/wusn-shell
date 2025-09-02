@@ -35,9 +35,10 @@ service_management() {
     echo "4. 重启服务"
     echo "5. 查看 SELinux 状态"
     echo "6. 控制 SELinux"
-    echo "7. 返回主菜单"
+    echo "7. DNF 镜像源切换管理"
+    echo "8. 返回主菜单"
 
-    read -p "请选择操作 [1-7]: " service_choice
+    read -p "请选择操作 [1-8]: " service_choice
 
     case $service_choice in
         1)
@@ -96,6 +97,9 @@ service_management() {
             esac
             ;;
         7)
+            mirror_management
+            ;;
+        8)
             return
             ;;
         *)
@@ -292,9 +296,9 @@ program_uninstall() {
 # 主菜单
 main_menu() {
     clear
-    echo -e "${YELLOW}==================================${NC}"
+    echo -e "${YELLOW}=====================================${NC}"
     echo -e "${YELLOW}    ${PANEL_TITLE}    ${NC}"
-    echo -e "${YELLOW}==================================${NC}"
+    echo -e "${YELLOW}=====================================${NC}"
     echo "1. 系统信息"
     echo "2. 服务管理"
     echo "3. 用户管理"
@@ -468,6 +472,118 @@ firewall_management() {
                 ;;
         esac
     done
+}
+
+# 镜像源管理
+mirror_management() {
+    check_root || return
+
+    while true; do
+        echo -e "\n${GREEN}=== 镜像源切换管理 ===${NC}"
+        echo -e "\n${YELLOW}注意：如果您之前已经更改了镜像源，请先恢复默认镜像再进行切换。否则，镜像切换不生效！${NC}"
+        echo "1. 查看当前镜像源配置"
+        echo "2. 切换为阿里云镜像源"
+        echo "3. 切换为清华大学镜像源"
+        echo "4. 恢复默认官方镜像源"
+        echo "5. 更新软件包缓存"
+        echo "6. 返回上一级"
+
+        read -p "请选择操作 [1-9]: " mirror_choice
+
+        case $mirror_choice in
+            1)
+                echo -e "\n${BLUE}当前镜像源配置:${NC}"
+                for file in /etc/yum.repos.d/[Rr]ocky*.repo; do
+                    if [[ -f "$file" ]]; then
+                        echo -e "\n${YELLOW}文件: $file${NC}"
+                        grep -E "baseurl=|mirrorlist=" "$file"
+                    fi
+                done
+                ;;
+            2)
+                echo -e "${BLUE}正在切换为阿里云镜像源...${NC}"
+                backup_mirror_configs
+                sed -e 's|^mirrorlist=|#mirrorlist=|g' \
+                    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
+                    -e 's|^baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
+                    -i.bak \
+                    /etc/yum.repos.d/[Rr]ocky*.repo 2>/dev/null
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}已成功切换为阿里云镜像源${NC}"
+                else
+                    echo -e "${RED}切换镜像源时出错${NC}"
+                fi
+                ;;
+            3)
+                echo -e "${BLUE}正在切换为清华大学镜像源...${NC}"
+                backup_mirror_configs
+                sed -e 's|^mirrorlist=|#mirrorlist=|g' \
+                    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.tuna.tsinghua.edu.cn/rocky|g' \
+                    -e 's|^baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.tuna.tsinghua.edu.cn/rocky|g' \
+                    -i.bak \
+                    /etc/yum.repos.d/[Rr]ocky*.repo 2>/dev/null
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}已成功切换为清华大学镜像源${NC}"
+                else
+                    echo -e "${RED}切换镜像源时出错${NC}"
+                fi
+                ;;
+            4)
+                echo -e "${BLUE}正在恢复默认官方镜像源...${NC}"
+                # 通过重新安装 rocky-release 包来恢复默认 repo 文件
+                if command -v dnf > /dev/null; then
+                    dnf reinstall -y rocky-release 2>/dev/null
+                    if [ $? -eq 0 ]; then
+                        echo -e "${GREEN}已通过重新安装 rocky-release 恢复默认镜像源${NC}"
+                    else
+                        # 如果重新安装失败，则尝试手动恢复
+                        for file in /etc/yum.repos.d/[Rr]ocky*.repo; do
+                            if [[ -f "$file" ]]; then
+                                # 恢复 mirrorlist 并注释自定义 baseurl
+                                sed -i 's|^#mirrorlist=|mirrorlist=|g' "$file"
+                                sed -i 's|^baseurl=https\{0,1\}://.*/rocky.*|#&|g' "$file"
+                                # 确保基本的 baseurl 存在
+                                if ! grep -q "^baseurl=http://dl.rockylinux.org/\$contentdir" "$file"; then
+                                    sed -i '/mirrorlist=.*/a baseurl=http://dl.rockylinux.org/$contentdir' "$file"
+                                fi
+                            fi
+                        done
+                        echo -e "${GREEN}已手动恢复默认官方镜像源${NC}"
+                    fi
+                else
+                    echo -e "${RED}未找到 dnf 命令，无法恢复默认镜像源${NC}"
+                fi
+                ;;
+            5)
+                echo -e "${BLUE}正在更新软件包缓存...${NC}"
+                dnf makecache
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}软件包缓存更新完成${NC}"
+                else
+                    echo -e "${RED}软件包缓存更新失败${NC}"
+                fi
+                ;;
+            6)
+                break
+                ;;
+            *)
+                echo -e "${RED}无效的选择!${NC}"
+                ;;
+        esac
+    done
+}
+
+# 备份镜像配置文件
+backup_mirror_configs() {
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local backup_dir="/etc/yum.repos.d/backup_$timestamp"
+
+    if [ ! -d "$backup_dir" ]; then
+        mkdir -p "$backup_dir"
+    fi
+
+    cp /etc/yum.repos.d/[Rr]ocky*.repo "$backup_dir/" 2>/dev/null
+    echo -e "${GREEN}已备份原始配置文件到 $backup_dir${NC}"
 }
 
 # 启动主菜单
