@@ -42,9 +42,11 @@ service_management() {
     echo "2. 启动服务"
     echo "3. 停止服务"
     echo "4. 重启服务"
-    echo "5. 返回主菜单"
+    echo "5. 查看 SELinux 状态"
+    echo "6. 控制 SELinux"
+    echo "7. 返回主菜单"
 
-    read -p "请选择操作 [1-5]: " service_choice
+    read -p "请选择操作 [1-7]: " service_choice
 
     case $service_choice in
         1)
@@ -64,6 +66,45 @@ service_management() {
             systemctl restart $service_name
             ;;
         5)
+            echo -e "\n${BLUE}SELinux 状态:${NC}"
+            sestatus
+            ;;
+        6)
+            echo -e "\n${GREEN}=== SELinux 控制 ===${NC}"
+            echo "当前 SELinux 状态: $(getenforce)"
+            echo "1. 切换 SELinux 为宽容模式 (需永配置 SELinux 永久启用)"
+            echo "2. 切换 SELinux 为严格模式 (需永配置 SELinux 永久启用)"
+            echo "3. 永久禁用 SELinux (需重启)"
+            echo "4. 永久启用 SELinux (需重启)"
+            echo "5. 返回上一级"
+
+            read -p "请选择操作 [1-5]: " selinux_choice
+
+            case $selinux_choice in
+                1)
+                    setenforce 0
+                    echo -e "${GREEN}SELinux 临时更改为宽容模式，重启失效${NC}"
+                    ;;
+                2)
+                    setenforce 1
+                    echo -e "${GREEN}SELinux 临时更改为严格模式，重启失效${NC}"
+                    ;;
+                3)
+                    sed -i 's/^SELINUX=.*/SELINUX=disabled/' /etc/selinux/config
+                    echo -e "${GREEN}SELinux 已设置为永久禁用，重启生效${NC}"
+                    ;;
+                4)
+                    sed -i 's/^SELINUX=.*/SELINUX=enforcing/' /etc/selinux/config
+                    echo -e "${GREEN}SELinux 已设置为永久启用，重启生效${NC}"
+                    ;;
+                5)
+                    ;;
+                *)
+                    echo -e "${RED}无效的选择!${NC}"
+                    ;;
+            esac
+            ;;
+        7)
             return
             ;;
         *)
