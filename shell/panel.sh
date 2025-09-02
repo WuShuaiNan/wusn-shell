@@ -13,15 +13,6 @@ PANEL_TITLE="达娃里氏的 Rocky 管理面板 v1.0"
 # 获取当前脚本所在目录
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
-# 检查是否是root用户
-check_root() {
-    if [ "$(id -u)" -ne 0 ]; then
-        echo -e "${RED}错误: 此操作需要root权限!${NC}" >&2
-        return 1
-    fi
-    return 0
-}
-
 # 1.显示系统信息
 show_system_info() {
     echo -e "\n${GREEN}=== 系统信息 ===${NC}"
@@ -165,9 +156,10 @@ network_tools() {
     echo "1. 查看IP地址"
     echo "2. 测试网络连通性"
     echo "3. 查看路由表"
-    echo "4. 返回主菜单"
+    echo "4. 防火墙管理"
+    echo "5. 返回主菜单"
 
-    read -p "请选择操作 [1-4]: " network_choice
+    read -p "请选择操作 [1-5]: " network_choice
 
     case $network_choice in
         1)
@@ -183,6 +175,9 @@ network_tools() {
             ip route
             ;;
         4)
+            firewall_management
+            ;;
+        5)
             return
             ;;
         *)
@@ -341,6 +336,138 @@ main_menu() {
     # 按任意键返回主菜单
     read -n 1 -s -r -p "按任意键返回主菜单..."
     main_menu
+}
+
+
+# 定义方法
+# 检查是否是root用户
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${RED}错误: 此操作需要root权限!${NC}" >&2
+        return 1
+    fi
+    return 0
+}
+
+# 防火墙管理
+firewall_management() {
+    check_root || return
+
+    while true; do
+        echo -e "\n${GREEN}=== 防火墙管理 ===${NC}"
+        echo "1. 查看防火墙状态"
+        echo "2. 启动防火墙"
+        echo "3. 停止防火墙"
+        echo "4. 重启防火墙"
+        echo "5. 查看开放的端口"
+        echo "6. 开放端口"
+        echo "7. 关闭端口"
+        echo "8. 重载防火墙配置"
+        echo "9. 查看活动区域"
+        echo "10. 设置防火墙开机自启"
+        echo "11. 关闭防火墙开机自启"
+        echo "12. 返回上一级"
+
+        read -p "请选择操作 [1-12]: " firewall_choice
+
+        case $firewall_choice in
+            1)
+                echo -e "\n${BLUE}防火墙状态:${NC}"
+                if systemctl is-active --quiet firewalld; then
+                    echo -e "${GREEN}防火墙正在运行${NC}"
+                    firewall-cmd --state
+                else
+                    echo -e "${RED}防火墙未运行${NC}"
+                fi
+                ;;
+            2)
+                systemctl start firewalld
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}防火墙启动成功${NC}"
+                else
+                    echo -e "${RED}防火墙启动失败${NC}"
+                fi
+                ;;
+            3)
+                systemctl stop firewalld
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}防火墙停止成功${NC}"
+                else
+                    echo -e "${RED}防火墙停止失败${NC}"
+                fi
+                ;;
+            4)
+                systemctl restart firewalld
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}防火墙重启成功${NC}"
+                else
+                    echo -e "${RED}防火墙重启失败${NC}"
+                fi
+                ;;
+            5)
+                if systemctl is-active --quiet firewalld; then
+                    echo -e "\n${BLUE}当前开放的端口:${NC}"
+                    firewall-cmd --list-all
+                else
+                    echo -e "${RED}防火墙未运行，无法查看端口信息${NC}"
+                fi
+                ;;
+            6)
+                read -p "请输入要开放的端口号: " port
+                read -p "请输入协议 (tcp/udp): " protocol
+                firewall-cmd --add-port=${port}/${protocol} --permanent
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}端口 ${port}/${protocol} 已添加到永久配置${NC}"
+                else
+                    echo -e "${RED}端口添加失败${NC}"
+                fi
+                ;;
+            7)
+                read -p "请输入要关闭的端口号: " port
+                read -p "请输入协议 (tcp/udp): " protocol
+                firewall-cmd --remove-port=${port}/${protocol} --permanent
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}端口 ${port}/${protocol} 已从永久配置中移除${NC}"
+                else
+                    echo -e "${RED}端口移除失败${NC}"
+                fi
+                ;;
+            8)
+                firewall-cmd --reload
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}防火墙配置重载成功${NC}"
+                else
+                    echo -e "${RED}防火墙配置重载失败${NC}"
+                fi
+                ;;
+            9)
+                echo -e "\n${BLUE}活动区域:${NC}"
+                firewall-cmd --get-active-zones
+                ;;
+            10)
+                systemctl enable firewalld
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}防火墙已设置为开机自启${NC}"
+                else
+                    echo -e "${RED}设置防火墙开机自启失败${NC}"
+                fi
+                ;;
+            11)
+                systemctl disable firewalld
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}防火墙已关闭开机自启${NC}"
+                else
+                    echo -e "${RED}关闭防火墙开机自启失败${NC}"
+                fi
+                ;;
+            12)
+                break
+                ;;
+            *)
+                echo -e "${RED}无效的选择!${NC}"
+                ;;
+        esac
+    done
 }
 
 # 启动主菜单
