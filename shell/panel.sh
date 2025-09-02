@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 面板标题
-PANEL_TITLE="达娃里氏的 Linux 管理面板 v1.0"
+PANEL_TITLE="达娃里氏的 Rocky 管理面板 v1.0"
 
 # 获取当前脚本所在目录
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
@@ -256,9 +256,9 @@ program_uninstall() {
 # 主菜单
 main_menu() {
     clear
-    echo -e "${YELLOW}=================================${NC}"
+    echo -e "${YELLOW}==================================${NC}"
     echo -e "${YELLOW}    ${PANEL_TITLE}    ${NC}"
-    echo -e "${YELLOW}=================================${NC}"
+    echo -e "${YELLOW}==================================${NC}"
     echo "1. 系统信息"
     echo "2. 服务管理"
     echo "3. 用户管理"
