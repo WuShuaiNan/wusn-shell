@@ -185,9 +185,10 @@ program_install() {
     echo "2. 安装 Telnet [0.17-66]"
     echo "3. 安装 Wget [1.14-18]"
     echo "4. 安装 Redis [6.2.19-1.el9_6.x86_64]"
-    echo "5. 返回主菜单"
+    echo "5. 安装 Tomcat [9.0.60]"
+    echo "6. 返回主菜单"
 
-    read -p "请选择操作 [1-5]: " install_choice
+    read -p "请选择操作 [1-6]: " install_choice
 
     case $install_choice in
         1)
@@ -234,6 +235,10 @@ program_install() {
             fi
             ;;
         5)
+            echo -e "${BLUE}正在安装 Tomcat ...${NC}"
+            install_tomcat
+            ;;
+        6)
             return
             ;;
         *)
@@ -252,9 +257,10 @@ program_uninstall() {
     echo "2. 卸载 Telnet [0.17-66]"
     echo "3. 卸载 Wget [1.14-18]"
     echo "4. 卸载 Redis [6.2.19-1.el9_6.x86_64]"
-    echo "5. 返回主菜单"
+    echo "5. 卸载 Tomcat [9.0.60]"
+    echo "6. 返回主菜单"
 
-    read -p "请选择操作 [1-5]: " uninstall_choice
+    read -p "请选择操作 [1-6]: " uninstall_choice
 
     case $uninstall_choice in
         1)
@@ -294,6 +300,10 @@ program_uninstall() {
             fi
             ;;
         5)
+            echo -e "${BLUE}正在卸载 Tomcat ...${NC}"
+            uninstall_tomcat
+            ;;
+        6)
             return
             ;;
         *)
@@ -353,7 +363,6 @@ main_menu() {
     read -n 1 -s -r -p "按任意键返回主菜单..."
     main_menu
 }
-
 
 # 定义方法
 # 检查是否是root用户
@@ -643,7 +652,7 @@ configure_redis_options() {
         echo -e "${BLUE}未设置密码${NC}"
     fi
 
-     # 配置开机自启
+    # 配置开机自启
     echo -e "\n${YELLOW}配置 Redis 开机自启${NC}"
     read -p "是否设置 Redis 开机自启？(y/n): " enable_autostart
     if [[ "$enable_autostart" == "y" || "$enable_autostart" == "Y" ]]; then
@@ -674,6 +683,182 @@ configure_redis_options() {
             echo -e "${RED}Redis 服务重启失败！请手动重启。${NC}"
         fi
     fi
+}
+
+# Tomcat安装
+install_tomcat() {
+    # 检查Tomcat压缩包是否存在
+    TOMCAT_PACKAGE="${SCRIPT_DIR}/package/tomcat/apache-tomcat-9.0.60.tar"
+
+    if [ ! -f "$TOMCAT_PACKAGE" ]; then
+        echo -e "${RED}Tomcat压缩包不存在: $TOMCAT_PACKAGE${NC}"
+        read -p "按回车键继续..."
+        return 1
+    fi
+
+    # 获取安装目录
+    read -p "请输入Tomcat安装目录 (默认 /usr/local/tomcat): " tomcat_install_dir
+    if [ -z "$tomcat_install_dir" ]; then
+        tomcat_install_dir="/usr/local/tomcat"
+    fi
+
+    echo -e "${BLUE}正在将Tomcat解压到 $tomcat_install_dir ...${NC}"
+
+    # 检查安装目录是否已存在
+    if [ -d "$tomcat_install_dir" ]; then
+        echo -e "${YELLOW}目录 $tomcat_install_dir 已存在${NC}"
+        read -p "是否覆盖该目录? (y/N): " overwrite_choice
+        case "$overwrite_choice" in
+            y|Y|yes|YES)
+                echo -e "${BLUE}正在清空目录 $tomcat_install_dir ...${NC}"
+                rm -rf "$tomcat_install_dir"/*
+                if [ $? -ne 0 ]; then
+                    echo -e "${RED}清空目录 $tomcat_install_dir 失败，请检查权限${NC}"
+                    read -p "按回车键继续..."
+                    return 1
+                fi
+                ;;
+            *)
+                echo -e "${YELLOW}取消安装${NC}"
+                read -p "按回车键继续..."
+                return 0
+                ;;
+        esac
+    else
+        # 创建安装目录（如果不存在）
+        mkdir -p "$tomcat_install_dir"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}创建目录 $tomcat_install_dir 失败，请检查权限${NC}"
+            read -p "按回车键继续..."
+            return 1
+        fi
+    fi
+
+    # 解压Tomcat
+    tar -xvf "$TOMCAT_PACKAGE" -C "$tomcat_install_dir" --strip-components=1
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Tomcat解压成功!${NC}"
+
+        # 赋予目录下所有文件权限
+        echo -e "${BLUE}正在设置文件权限...${NC}"
+        chmod -R 755 "$tomcat_install_dir"
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Tomcat安装完成，所有文件权限已设置为755!${NC}"
+        else
+            echo -e "${RED}设置文件权限失败!${NC}"
+        fi
+    else
+        echo -e "${RED}Tomcat解压失败!${NC}"
+    fi
+
+    # 询问是否配置为系统服务
+    echo -e "\n${YELLOW}是否将Tomcat配置为系统服务（守护进程）？${NC}"
+    read -p "配置为系统服务？(y/n): " configure_service
+    if [[ "$configure_service" == "y" || "$configure_service" == "Y" ]]; then
+        # 创建systemd服务文件
+        cat > "/usr/lib/systemd/system/tomcat.service" <<EOF
+[Unit]
+Description=Tomcat Service
+After=syslog.target network.target
+
+[Service]
+Type=forking
+ExecStart=${tomcat_install_dir}/bin/catalina.sh start
+ExecReload=${tomcat_install_dir}/bin/catalina.sh restart
+ExecStop=${tomcat_install_dir}/bin/catalina.sh stop
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    fi
+
+    # 询问是否设置开机自启
+    echo -e "\n${YELLOW}是否设置Tomcat开机自启？${NC}"
+    read -p "设置开机自启？(y/n): " enable_autostart
+    if [[ "$enable_autostart" == "y" || "$enable_autostart" == "Y" ]]; then
+        systemctl enable tomcat &>/dev/null
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Tomcat已设置为开机自启！${NC}"
+        else
+            echo -e "${RED}设置Tomcat开机自启失败！${NC}"
+        fi
+    else
+        echo -e "${BLUE}已跳过设置Tomcat开机自启。${NC}"
+    fi
+
+    # 询问是否启动Tomcat服务
+    read -p "是否现在启动 Tomcat 服务？(y/n): " start_tomcat
+    if [[ "$start_tomcat" == "y" || "$start_tomcat" == "Y" ]]; then
+        systemctl start tomcat
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Tomcat 服务启动成功！${NC}"
+        else
+            echo -e "${RED}Tomcat 服务启动失败！${NC}"
+        fi
+    fi
+
+    read -p "按回车键继续..."
+}
+
+# Tomcat卸载
+uninstall_tomcat() {
+    # 获取Tomcat安装目录
+    read -p "请输入Tomcat安装目录 (默认 /usr/local/tomcat): " tomcat_install_dir
+    if [ -z "$tomcat_install_dir" ]; then
+        tomcat_install_dir="/usr/local/tomcat"
+    fi
+
+    # 检查目录是否存在
+    if [ ! -d "$tomcat_install_dir" ]; then
+        echo -e "${RED}指定的Tomcat目录不存在: $tomcat_install_dir${NC}"
+        read -p "按回车键继续..."
+        return 1
+    fi
+
+    echo -e "${BLUE}正在停止Tomcat服务...${NC}"
+    # 停止Tomcat服务（如果正在运行）
+    systemctl stop tomcat &>/dev/null
+
+    echo -e "${BLUE}正在禁用Tomcat开机自启...${NC}"
+    # 禁用Tomcat开机自启
+    systemctl disable tomcat &>/dev/null
+
+    echo -e "${BLUE}正在删除Tomcat目录...${NC}"
+    # 删除Tomcat目录
+    rm -rf "$tomcat_install_dir"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Tomcat目录删除成功: $tomcat_install_dir${NC}"
+    else
+        echo -e "${RED}Tomcat目录删除失败: $tomcat_install_dir${NC}"
+        read -p "按回车键继续..."
+        return 1
+    fi
+
+    echo -e "${BLUE}正在移除Tomcat服务文件...${NC}"
+    # 删除systemd服务文件
+    if [ -f "/usr/lib/systemd/system/tomcat.service" ]; then
+        rm -f /usr/lib/systemd/system/tomcat.service
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Tomcat服务文件移除成功${NC}"
+        else
+            echo -e "${RED}Tomcat服务文件移除失败${NC}"
+        fi
+    else
+        echo -e "${YELLOW}未找到Tomcat服务文件${NC}"
+    fi
+
+    echo -e "${BLUE}正在刷新systemd配置...${NC}"
+    # 重新加载systemd配置
+    systemctl daemon-reload
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}systemd配置刷新成功${NC}"
+    else
+        echo -e "${RED}systemd配置刷新失败${NC}"
+    fi
+
+    echo -e "${GREEN}Tomcat卸载完成!${NC}"
+    read -p "按回车键继续..."
 }
 
 # 启动主菜单
