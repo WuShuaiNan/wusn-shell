@@ -28,17 +28,14 @@ show_system_info() {
 service_management() {
     check_root || return
 
-    echo -e "\n${GREEN}=== 服务管理 ===${NC}"
-    echo "1. 查看服务状态"
-    echo "2. 启动服务"
-    echo "3. 停止服务"
-    echo "4. 重启服务"
-    echo "5. 查看 SELinux 状态"
-    echo "6. 控制 SELinux"
-    echo "7. DNF 镜像源切换管理"
-    echo "8. 返回主菜单"
+    echo -e "\n${GREEN}=== 系统服务 ===${NC}"
+    echo "1. 查看系统服务状态"
+    echo "2. 查看 SELinux 状态"
+    echo "3. 控制 SELinux"
+    echo "4. DNF 镜像源切换管理"
+    echo "5. 返回主菜单"
 
-    read -p "请选择操作 [1-8]: " service_choice
+    read -p "请选择操作 [1-5]: " service_choice
 
     case $service_choice in
         1)
@@ -46,22 +43,10 @@ service_management() {
             systemctl status $service_name
             ;;
         2)
-            read -p "输入服务名: " service_name
-            systemctl start $service_name
-            ;;
-        3)
-            read -p "输入服务名: " service_name
-            systemctl stop $service_name
-            ;;
-        4)
-            read -p "输入服务名: " service_name
-            systemctl restart $service_name
-            ;;
-        5)
             echo -e "\n${BLUE}SELinux 状态:${NC}"
             sestatus
             ;;
-        6)
+        3)
             echo -e "\n${GREEN}=== SELinux 控制 ===${NC}"
             echo "当前 SELinux 状态: $(getenforce)"
             echo "1. 切换 SELinux 为宽容模式 (需永配置 SELinux 永久启用)"
@@ -96,10 +81,10 @@ service_management() {
                     ;;
             esac
             ;;
-        7)
+        4)
             mirror_management
             ;;
-        8)
+        5)
             return
             ;;
         *)
@@ -199,9 +184,10 @@ program_install() {
     echo "1. 安装 OpenJDK [1.8.0.412.b08]"
     echo "2. 安装 Telnet [0.17-66]"
     echo "3. 安装 Wget [1.14-18]"
-    echo "4. 返回主菜单"
+    echo "4. 安装 Redis [6.2.19-1.el9_6.x86_64]"
+    echo "5. 返回主菜单"
 
-    read -p "请选择操作 [1-4]: " install_choice
+    read -p "请选择操作 [1-5]: " install_choice
 
     case $install_choice in
         1)
@@ -232,6 +218,22 @@ program_install() {
             fi
             ;;
         4)
+            echo -e "${BLUE}正在安装 Redis ...${NC}"
+            if bash ${SCRIPT_DIR}/package/redis/install.sh; then
+                echo -e "${GREEN} Redis 安装成功!${NC}"
+
+                # Redis配置选项
+                echo -e "\n${YELLOW}是否需要配置 Redis？${NC}"
+                read -p "配置端口、密码等选项？(y/n): " configure_redis
+                if [[ "$configure_redis" == "y" || "$configure_redis" == "Y" ]]; then
+                    configure_redis_options
+                fi
+            else
+                echo -e "${RED} Redis 安装失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        5)
             return
             ;;
         *)
@@ -249,9 +251,10 @@ program_uninstall() {
     echo "1. 卸载 OpenJDK [1.8.0.412.b08]"
     echo "2. 卸载 Telnet [0.17-66]"
     echo "3. 卸载 Wget [1.14-18]"
-    echo "4. 返回主菜单"
+    echo "4. 卸载 Redis [6.2.19-1.el9_6.x86_64]"
+    echo "5. 返回主菜单"
 
-    read -p "请选择操作 [1-3]: " uninstall_choice
+    read -p "请选择操作 [1-5]: " uninstall_choice
 
     case $uninstall_choice in
         1)
@@ -282,6 +285,15 @@ program_uninstall() {
             fi
             ;;
         4)
+            echo -e "${BLUE}正在卸载 Redis ...${NC}"
+            if bash ${SCRIPT_DIR}/package/redis/uninstall.sh; then
+                echo -e "${GREEN} Redis 卸载成功!${NC}"
+            else
+                echo -e "${RED} Redis 卸载失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        5)
             return
             ;;
         *)
@@ -296,9 +308,9 @@ program_uninstall() {
 # 主菜单
 main_menu() {
     clear
-    echo -e "${YELLOW}=====================================${NC}"
+    echo -e "${YELLOW}======================================${NC}"
     echo -e "${YELLOW}    ${PANEL_TITLE}    ${NC}"
-    echo -e "${YELLOW}=====================================${NC}"
+    echo -e "${YELLOW}======================================${NC}"
     echo "1. 系统信息"
     echo "2. 服务管理"
     echo "3. 用户管理"
@@ -530,29 +542,14 @@ mirror_management() {
                 ;;
             4)
                 echo -e "${BLUE}正在恢复默认官方镜像源...${NC}"
-                # 通过重新安装 rocky-release 包来恢复默认 repo 文件
-                if command -v dnf > /dev/null; then
-                    dnf reinstall -y rocky-release 2>/dev/null
-                    if [ $? -eq 0 ]; then
-                        echo -e "${GREEN}已通过重新安装 rocky-release 恢复默认镜像源${NC}"
-                    else
-                        # 如果重新安装失败，则尝试手动恢复
-                        for file in /etc/yum.repos.d/[Rr]ocky*.repo; do
-                            if [[ -f "$file" ]]; then
-                                # 恢复 mirrorlist 并注释自定义 baseurl
-                                sed -i 's|^#mirrorlist=|mirrorlist=|g' "$file"
-                                sed -i 's|^baseurl=https\{0,1\}://.*/rocky.*|#&|g' "$file"
-                                # 确保基本的 baseurl 存在
-                                if ! grep -q "^baseurl=http://dl.rockylinux.org/\$contentdir" "$file"; then
-                                    sed -i '/mirrorlist=.*/a baseurl=http://dl.rockylinux.org/$contentdir' "$file"
-                                fi
-                            fi
-                        done
-                        echo -e "${GREEN}已手动恢复默认官方镜像源${NC}"
+                # 恢复被注释掉的mirrorlist并恢复baseurl为默认值
+                for file in /etc/yum.repos.d/[Rr]ocky*.repo; do
+                    if [[ -f "$file" ]]; then
+                        sed -i 's|^#mirrorlist=|mirrorlist=|g' "$file"
+                        sed -i 's|^baseurl=.*rockylinux.*|baseurl=http://dl.rockylinux.org/$contentdir|g' "$file"
                     fi
-                else
-                    echo -e "${RED}未找到 dnf 命令，无法恢复默认镜像源${NC}"
-                fi
+                done
+                echo -e "${GREEN}已恢复默认官方镜像源${NC}"
                 ;;
             5)
                 echo -e "${BLUE}正在更新软件包缓存...${NC}"
@@ -584,6 +581,99 @@ backup_mirror_configs() {
 
     cp /etc/yum.repos.d/[Rr]ocky*.repo "$backup_dir/" 2>/dev/null
     echo -e "${GREEN}已备份原始配置文件到 $backup_dir${NC}"
+}
+
+# Redis配置函数
+configure_redis_options() {
+    echo -e "\n${GREEN}=== Redis 配置 ===${NC}"
+
+    # 查找Redis配置文件
+    REDIS_CONF=""
+    if [ -f "/etc/redis/redis.conf" ]; then
+        REDIS_CONF="/etc/redis/redis.conf"
+    elif [ -f "/etc/redis.conf" ]; then
+        REDIS_CONF="/etc/redis.conf"
+    else
+        echo -e "${YELLOW}未找到 Redis 配置文件，请手动指定路径${NC}"
+        read -p "请输入 Redis 配置文件路径: " REDIS_CONF
+        if [ ! -f "$REDIS_CONF" ]; then
+            echo -e "${RED}指定的配置文件不存在！${NC}"
+            return 1
+        fi
+    fi
+
+    echo -e "${BLUE}找到 Redis 配置文件: $REDIS_CONF${NC}"
+
+    # 配置端口号
+    read -p "请输入端口号 (默认 6379): " redis_port
+    if [ -n "$redis_port" ]; then
+        sed -i "s/^port .*/port $redis_port/" $REDIS_CONF
+        echo -e "${GREEN}端口号已设置为: $redis_port${NC}"
+    else
+        echo -e "${BLUE}使用默认端口号: 6379${NC}"
+    fi
+
+    # 配置外网访问
+        echo -e "\n${YELLOW}配置 Redis 外网访问${NC}"
+        read -p "是否允许 Redis 外网访问？(y/n): " enable_external_access
+        if [[ "$enable_external_access" == "y" || "$enable_external_access" == "Y" ]]; then
+            # 设置为监听所有IP地址
+            sed -i 's/^bind .*/bind 0.0.0.0/' $REDIS_CONF
+            echo -e "${GREEN}已允许 Redis 外网访问${NC}"
+
+            # 提示用户需要配置防火墙
+            echo -e "${YELLOW}注意: 请确保防火墙已开放 Redis 端口${NC}"
+        else
+            # 限制为仅本地访问
+            sed -i 's/^bind .*/bind 127.0.0.1/' $REDIS_CONF
+            echo -e "${BLUE}已限制 Redis 仅本地访问${NC}"
+        fi
+
+    # 配置密码
+    read -p "请输入密码 (留空则不设置密码): " redis_password
+    if [ -n "$redis_password" ]; then
+        # 删除原有的密码配置行
+        sed -i '/^requirepass/d' $REDIS_CONF
+        # 添加新的密码配置行
+        echo "requirepass $redis_password" >> $REDIS_CONF
+        echo -e "${GREEN}密码已设置${NC}"
+    else
+        # 移除密码配置
+        sed -i '/^requirepass/d' $REDIS_CONF
+        echo -e "${BLUE}未设置密码${NC}"
+    fi
+
+     # 配置开机自启
+    echo -e "\n${YELLOW}配置 Redis 开机自启${NC}"
+    read -p "是否设置 Redis 开机自启？(y/n): " enable_autostart
+    if [[ "$enable_autostart" == "y" || "$enable_autostart" == "Y" ]]; then
+        # 检查systemctl是否可用
+        if command -v systemctl &> /dev/null; then
+            systemctl enable redis &> /dev/null
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Redis 开机自启已设置成功！${NC}"
+            else
+                echo -e "${RED}设置 Redis 开机自启失败！请检查 Redis 服务是否存在。${NC}"
+            fi
+        else
+            echo -e "${RED}系统不支持 systemctl 命令，无法设置开机自启。${NC}"
+        fi
+    else
+        echo -e "${BLUE}跳过设置开机自启。${NC}"
+    fi
+
+    echo -e "${GREEN}Redis 配置完成！请重启 Redis 服务使配置生效。${NC}"
+
+    # 询问是否重启Redis服务
+    read -p "是否现在重启 Redis 服务？(y/n): " restart_redis
+    if [[ "$restart_redis" == "y" || "$restart_redis" == "Y" ]]; then
+        systemctl restart redis
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Redis 服务重启成功！${NC}"
+        else
+            echo -e "${RED}Redis 服务重启失败！请手动重启。${NC}"
+        fi
+    fi
 }
 
 # 启动主菜单
