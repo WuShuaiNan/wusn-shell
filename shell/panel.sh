@@ -186,9 +186,10 @@ program_install() {
     echo "3. 安装 Wget [1.14-18]"
     echo "4. 安装 Redis [6.2.19-1.el9_6.x86_64]"
     echo "5. 安装 Tomcat [9.0.60]"
-    echo "6. 返回主菜单"
+    echo "6. 安装 Vsftpd [3.0.5-6.el9.x86_64]"
+    echo "7. 返回主菜单"
 
-    read -p "请选择操作 [1-6]: " install_choice
+    read -p "请选择操作 [1-7]: " install_choice
 
     case $install_choice in
         1)
@@ -239,6 +240,15 @@ program_install() {
             install_tomcat
             ;;
         6)
+            echo -e "${BLUE}正在安装 Vsftpd ...${NC}"
+            if bash ${SCRIPT_DIR}/package/vsftpd/install.sh; then
+                echo -e "${GREEN} Vsftpd 安装成功!${NC}"
+            else
+                echo -e "${RED} Vsftpd 安装失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        7)
             return
             ;;
         *)
@@ -258,9 +268,10 @@ program_uninstall() {
     echo "3. 卸载 Wget [1.14-18]"
     echo "4. 卸载 Redis [6.2.19-1.el9_6.x86_64]"
     echo "5. 卸载 Tomcat [9.0.60]"
-    echo "6. 返回主菜单"
+    echo "6. 卸载 Vsftpd [3.0.5-6.el9.x86_64]"
+    echo "7. 返回主菜单"
 
-    read -p "请选择操作 [1-6]: " uninstall_choice
+    read -p "请选择操作 [1-7]: " uninstall_choice
 
     case $uninstall_choice in
         1)
@@ -304,6 +315,15 @@ program_uninstall() {
             uninstall_tomcat
             ;;
         6)
+            echo -e "${BLUE}正在卸载 Vsftpd ...${NC}"
+            if bash ${SCRIPT_DIR}/package/vsftpd/uninstall.sh; then
+                echo -e "${GREEN} Vsftpd 卸载成功!${NC}"
+            else
+                echo -e "${RED} Vsftpd 卸载失败! 错误代码: $?${NC}"
+                read -p "按回车键继续..."
+            fi
+            ;;
+        7)
             return
             ;;
         *)
