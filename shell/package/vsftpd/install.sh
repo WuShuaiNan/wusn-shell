@@ -20,7 +20,7 @@ install_vsftpd() {
 
     # 使用本地rpm包安装
     SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-    RPM_FILE="$SCRIPT_DIR/vsftpd-3.0.2-25.el7.x86_64.rpm"
+    RPM_FILE="$SCRIPT_DIR/vsftpd-3.0.2-29.el7_9.x86_64.rpm"
 
     if [ -f "$RPM_FILE" ]; then
         rpm -ivh "$RPM_FILE"
