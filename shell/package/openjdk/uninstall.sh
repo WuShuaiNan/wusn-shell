@@ -12,6 +12,22 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # 检查目录中是否有RPM文件
 rpm_files=$(ls "$DIR"/*.rpm 2>/dev/null | wc -l)
 if [ "$rpm_files" -eq 0 ]; then
+    echo "当前目录 ($DIR) 中没有找到RPM包，尝试使用yum卸载OpenJDK。"
+    yum remove -y java-1.8.0-openjdk java-1.8.0-openjdk-devel
+    if [ $? -eq 0 ]; then
+        echo "OpenJDK已通过yum卸载完成。"
+    else
+        echo "通过yum卸载OpenJDK失败，可能未安装。"
+    fi
+    exit 0
+fi
+
+# 获取当前目录
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# 检查目录中是否有RPM文件
+rpm_files=$(ls "$DIR"/*.rpm 2>/dev/null | wc -l)
+if [ "$rpm_files" -eq 0 ]; then
     echo "当前目录 ($DIR) 中没有找到RPM包。"
     exit 0
 fi

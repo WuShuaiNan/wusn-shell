@@ -11,8 +11,14 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 # 检查脚本所在目录下是否有RPM文件
 if ! ls "${SCRIPT_DIR}"/*.rpm >/dev/null 2>&1; then
-    echo "错误：脚本目录下未找到任何RPM包文件。"
-    exit 1
+    echo "错误：脚本目录下未找到任何RPM包文件，尝试使用yum安装redis。"
+    yum install -y redis
+    if [ $? -ne 0 ]; then
+        echo "使用yum安装redis也失败。"
+        exit 1
+    fi
+    echo "Redis通过yum安装完成。"
+    exit 0
 fi
 
 # 安装所有RPM包

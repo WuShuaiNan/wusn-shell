@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#!/bin/bash
+
 # 检查当前用户是否为root
 if [ "$(id -u)" -ne 0 ]; then
     echo "错误：此脚本需要root权限才能执行RPM卸载操作。"

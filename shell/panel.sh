@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 面板标题
-PANEL_TITLE="达娃里氏的 Rocky 管理面板 v1.0"
+PANEL_TITLE="CentOS 7 管理面板 v1.0"
 
 # 获取当前脚本所在目录
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
@@ -17,7 +17,7 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 show_system_info() {
     echo -e "\n${GREEN}=== 系统信息 ===${NC}"
     echo -e "主机名: $(hostname)"
-    echo -e "操作系统: $(cat /etc/centos-release)"
+    echo -e "操作系统: $(cat /etc/redhat-release)"
     echo -e "内核版本: $(uname -r)"
     echo -e "CPU信息: $(grep 'model name' /proc/cpuinfo | head -n1 | cut -d':' -f2 | sed 's/^[ \t]*//')"
     echo -e "内存使用: $(free -h | grep Mem | awk '{print $3"/"$2}')"
@@ -545,10 +545,10 @@ mirror_management() {
                 echo -e "${BLUE}正在切换为阿里云镜像源...${NC}"
                 backup_mirror_configs
                 sed -e 's|^mirrorlist=|#mirrorlist=|g' \
-                    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
-                    -e 's|^baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.aliyun.com/rockylinux|g' \
+                    -e 's|^#baseurl=http://mirror.centos.org/centos|baseurl=https://mirrors.aliyun.com/centos|g' \
+                    -e 's|^baseurl=http://mirror.centos.org/centos|baseurl=https://mirrors.aliyun.com/centos|g' \
                     -i.bak \
-                    /etc/yum.repos.d/[Rr]ocky*.repo 2>/dev/null
+                    /etc/yum.repos.d/CentOS-Base.repo 2>/dev/null
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}已成功切换为阿里云镜像源${NC}"
                 else
@@ -559,10 +559,10 @@ mirror_management() {
                 echo -e "${BLUE}正在切换为清华大学镜像源...${NC}"
                 backup_mirror_configs
                 sed -e 's|^mirrorlist=|#mirrorlist=|g' \
-                    -e 's|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.tuna.tsinghua.edu.cn/rocky|g' \
-                    -e 's|^baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.tuna.tsinghua.edu.cn/rocky|g' \
+                    -e 's|^#baseurl=http://mirror.centos.org/centos|baseurl=https://mirrors.tuna.tsinghua.edu.cn/centos|g' \
+                    -e 's|^baseurl=http://mirror.centos.org/centos|baseurl=https://mirrors.tuna.tsinghua.edu.cn/centos|g' \
                     -i.bak \
-                    /etc/yum.repos.d/[Rr]ocky*.repo 2>/dev/null
+                    /etc/yum.repos.d/CentOS-Base.repo 2>/dev/null
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}已成功切换为清华大学镜像源${NC}"
                 else
@@ -572,17 +572,17 @@ mirror_management() {
             4)
                 echo -e "${BLUE}正在恢复默认官方镜像源...${NC}"
                 # 恢复被注释掉的mirrorlist并恢复baseurl为默认值
-                for file in /etc/yum.repos.d/[Rr]ocky*.repo; do
+                for file in /etc/yum.repos.d/CentOS-Base.repo; do
                     if [[ -f "$file" ]]; then
                         sed -i 's|^#mirrorlist=|mirrorlist=|g' "$file"
-                        sed -i 's|^baseurl=.*rockylinux.*|baseurl=http://dl.rockylinux.org/$contentdir|g' "$file"
+                        sed -i 's|^baseurl=.*centos.*|baseurl=http://mirror.centos.org/centos|g' "$file"
                     fi
                 done
                 echo -e "${GREEN}已恢复默认官方镜像源${NC}"
                 ;;
             5)
                 echo -e "${BLUE}正在更新软件包缓存...${NC}"
-                dnf makecache
+                yum clean all && yum makecache
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}软件包缓存更新完成${NC}"
                 else
@@ -608,7 +608,7 @@ backup_mirror_configs() {
         mkdir -p "$backup_dir"
     fi
 
-    cp /etc/yum.repos.d/[Rr]ocky*.repo "$backup_dir/" 2>/dev/null
+    cp /etc/yum.repos.d/CentOS-Base.repo "$backup_dir/" 2>/dev/null
     echo -e "${GREEN}已备份原始配置文件到 $backup_dir${NC}"
 }
 
@@ -775,8 +775,10 @@ install_tomcat() {
     echo -e "\n${YELLOW}是否将Tomcat配置为系统服务（守护进程）？${NC}"
     read -p "配置为系统服务？(y/n): " configure_service
     if [[ "$configure_service" == "y" || "$configure_service" == "Y" ]]; then
-        # 创建systemd服务文件
-        cat > "/usr/lib/systemd/system/tomcat.service" <<EOF
+        # 检测系统类型并创建相应服务文件
+        if [ -f /etc/redhat-release ] && grep -q "release 7" /etc/redhat-release; then
+            # CentOS 7 使用 systemd
+            cat > "/usr/lib/systemd/system/tomcat.service" <<EOF
 [Unit]
 Description=Tomcat Service
 After=syslog.target network.target
@@ -791,17 +793,78 @@ PrivateTmp=true
 [Install]
 WantedBy=multi-user.target
 EOF
+        else
+            # 对于较老的系统，创建init.d脚本
+            cat > "/etc/init.d/tomcat" <<EOF
+#!/bin/bash
+# chkconfig: 35 80
+# description: Tomcat service
+
+. /etc/rc.d/init.d/functions
+
+TOMCAT_HOME=${tomcat_install_dir}
+
+start() {
+    echo -n "Starting Tomcat: "
+    daemon \$TOMCAT_HOME/bin/catalina.sh start
+    RETVAL=\$?
+    echo
+    [ \$RETVAL -eq 0 ] && touch /var/lock/subsys/tomcat
+    return \$RETVAL
+}
+
+stop() {
+    echo -n "Shutting down Tomcat: "
+    \$TOMCAT_HOME/bin/catalina.sh stop
+    RETVAL=\$?
+    echo
+    [ \$RETVAL -eq 0 ] && rm -f /var/lock/subsys/tomcat
+    return \$RETVAL
+}
+
+case "\$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "Usage: \$0 {start|stop|restart}"
+        exit 1
+esac
+
+exit \$?
+EOF
+            chmod +x /etc/init.d/tomcat
+        fi
     fi
 
     # 询问是否设置开机自启
     echo -e "\n${YELLOW}是否设置Tomcat开机自启？${NC}"
     read -p "设置开机自启？(y/n): " enable_autostart
     if [[ "$enable_autostart" == "y" || "$enable_autostart" == "Y" ]]; then
-        systemctl enable tomcat &>/dev/null
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}Tomcat已设置为开机自启！${NC}"
+        if [ -f /etc/redhat-release ] && grep -q "release 7" /etc/redhat-release; then
+            # CentOS 7 使用 systemctl
+            systemctl enable tomcat &>/dev/null
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Tomcat已设置为开机自启！${NC}"
+            else
+                echo -e "${RED}设置Tomcat开机自启失败！${NC}"
+            fi
         else
-            echo -e "${RED}设置Tomcat开机自启失败！${NC}"
+            # 较老的系统使用 chkconfig
+            chkconfig --add tomcat
+            chkconfig tomcat on
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Tomcat已设置为开机自启！${NC}"
+            else
+                echo -e "${RED}设置Tomcat开机自启失败！${NC}"
+            fi
         fi
     else
         echo -e "${BLUE}已跳过设置Tomcat开机自启。${NC}"
@@ -810,7 +873,13 @@ EOF
     # 询问是否启动Tomcat服务
     read -p "是否现在启动 Tomcat 服务？(y/n): " start_tomcat
     if [[ "$start_tomcat" == "y" || "$start_tomcat" == "Y" ]]; then
-        systemctl start tomcat
+        if [ -f /etc/redhat-release ] && grep -q "release 7" /etc/redhat-release; then
+            # CentOS 7 使用 systemctl
+            systemctl start tomcat
+        else
+            # 较老的系统使用 service
+            service tomcat start
+        fi
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}Tomcat 服务启动成功！${NC}"
         else
@@ -837,12 +906,16 @@ uninstall_tomcat() {
     fi
 
     echo -e "${BLUE}正在停止Tomcat服务...${NC}"
-    # 停止Tomcat服务（如果正在运行）
-    systemctl stop tomcat &>/dev/null
-
-    echo -e "${BLUE}正在禁用Tomcat开机自启...${NC}"
-    # 禁用Tomcat开机自启
-    systemctl disable tomcat &>/dev/null
+    # 检测系统类型并停止服务
+    if [ -f /etc/redhat-release ] && grep -q "release 7" /etc/redhat-release; then
+        # CentOS 7 使用 systemctl
+        systemctl stop tomcat &>/dev/null
+        systemctl disable tomcat &>/dev/null
+    else
+        # 较老的系统使用 service 和 chkconfig
+        service tomcat stop &>/dev/null
+        chkconfig --del tomcat &>/dev/null
+    fi
 
     echo -e "${BLUE}正在删除Tomcat目录...${NC}"
     # 删除Tomcat目录
@@ -856,25 +929,39 @@ uninstall_tomcat() {
     fi
 
     echo -e "${BLUE}正在移除Tomcat服务文件...${NC}"
-    # 删除systemd服务文件
-    if [ -f "/usr/lib/systemd/system/tomcat.service" ]; then
-        rm -f /usr/lib/systemd/system/tomcat.service
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}Tomcat服务文件移除成功${NC}"
+    # 检测系统类型并删除相应服务文件
+    if [ -f /etc/redhat-release ] && grep -q "release 7" /etc/redhat-release; then
+        # CentOS 7 删除systemd服务文件
+        if [ -f "/usr/lib/systemd/system/tomcat.service" ]; then
+            rm -f /usr/lib/systemd/system/tomcat.service
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Tomcat systemd服务文件移除成功${NC}"
+            else
+                echo -e "${RED}Tomcat systemd服务文件移除失败${NC}"
+            fi
         else
-            echo -e "${RED}Tomcat服务文件移除失败${NC}"
+            echo -e "${YELLOW}未找到Tomcat systemd服务文件${NC}"
+        fi
+        
+        # 重新加载systemd配置
+        systemctl daemon-reload
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}systemd配置刷新成功${NC}"
+        else
+            echo -e "${RED}systemd配置刷新失败${NC}"
         fi
     else
-        echo -e "${YELLOW}未找到Tomcat服务文件${NC}"
-    fi
-
-    echo -e "${BLUE}正在刷新systemd配置...${NC}"
-    # 重新加载systemd配置
-    systemctl daemon-reload
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}systemd配置刷新成功${NC}"
-    else
-        echo -e "${RED}systemd配置刷新失败${NC}"
+        # 较老的系统删除init.d脚本
+        if [ -f "/etc/init.d/tomcat" ]; then
+            rm -f /etc/init.d/tomcat
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Tomcat init.d脚本移除成功${NC}"
+            else
+                echo -e "${RED}Tomcat init.d脚本移除失败${NC}"
+            fi
+        else
+            echo -e "${YELLOW}未找到Tomcat init.d脚本${NC}"
+        fi
     fi
 
     echo -e "${GREEN}Tomcat卸载完成!${NC}"

@@ -21,7 +21,7 @@ ls "$DIR"/*.rpm
 
 # 先停止Redis服务
 echo "正在停止Redis服务..."
-systemctl stop redis 2>/dev/null
+systemctl stop redis 2>/dev/null || service redis stop 2>/dev/null
 if [ $? -eq 0 ]; then
     echo "Redis服务已停止。"
 else
